@@ -1,0 +1,17 @@
+[Unit]
+Description=Claude Code Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Edit User and paths to match your VPS layout.
+User=REPLACE_WITH_YOUR_USER
+WorkingDirectory=/home/REPLACE_WITH_YOUR_USER/Playground
+EnvironmentFile=/home/REPLACE_WITH_YOUR_USER/Playground/.env
+ExecStart=/home/REPLACE_WITH_YOUR_USER/Playground/.venv/bin/python /home/REPLACE_WITH_YOUR_USER/Playground/bot.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
