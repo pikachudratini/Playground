@@ -1,14 +1,16 @@
 """Kie.ai multi-model menu tool.
 
 Lets you call several different AI models on kie.ai through one script:
-  - text   → Gemini 3 Flash (chat / Q&A / summaries)
-  - image  → Flux Kontext Pro (image generation)
-  - music  → Suno V4 (music generation)
+  - text   -> Gemini 3 Flash       (chat / Q&A / summaries)         [sync]
+  - image  -> GPT Image 2          (text-to-image generation)       [async]
+  - video  -> Wan 2.7              (text-to-video generation)       [async]
+  - music  -> Suno V4              (music generation)               [async]
 
 Usage:
     python kie.py list
-    python kie.py text "Explain photosynthesis in three sentences"
+    python kie.py text  "Explain photosynthesis in three sentences"
     python kie.py image "A cat playing piano in a jazz club"
+    python kie.py video "A drone flying over a coastal city at sunset"
     python kie.py music "A relaxing lo-fi beat for studying"
 
 Output files land in projects/kie-menu/outputs/<category>/.
@@ -31,8 +33,10 @@ from dotenv import load_dotenv
 BASE = "https://api.kie.ai"
 OUTPUTS = Path(__file__).with_name("outputs")
 POLL_INTERVAL = 5
-POLL_TIMEOUT = 600  # 10 minutes
+POLL_TIMEOUT = 900  # 15 minutes (video can be slow)
 
+
+# -------- helpers --------
 
 def auth(api_key: str) -> dict:
     return {
@@ -59,7 +63,7 @@ def get(path: str, params: dict, api_key: str) -> dict:
 
 
 def poll(task_id: str, api_key: str) -> dict:
-    print(f"Polling task {task_id} (this can take 30s-3min)...")
+    print(f"Polling task {task_id} (this can take 30s-several minutes)...")
     start = time.time()
     while time.time() - start < POLL_TIMEOUT:
         info = get("/api/v1/jobs/recordInfo", {"taskId": task_id}, api_key)
@@ -89,13 +93,53 @@ def output_path(category: str, prompt: str, ext: str) -> Path:
     return folder / f"{stamp}-{slugify(prompt)}.{ext}"
 
 
+def extract_urls(data: dict, *field_names: str) -> list:
+    """Pull URLs out of a kie.ai task result. Different models put them in
+    different fields; we try a few common ones."""
+    candidates = []
+    for f in field_names:
+        v = data.get(f)
+        if isinstance(v, list):
+            candidates.extend(v)
+        elif isinstance(v, str):
+            candidates.append(v)
+    info = data.get("info") or data.get("response") or {}
+    if isinstance(info, dict):
+        for f in (*field_names, "resultUrls", "outputs", "urls"):
+            v = info.get(f)
+            if isinstance(v, list):
+                candidates.extend(v)
+            elif isinstance(v, str):
+                candidates.append(v)
+    return [c for c in candidates if isinstance(c, str) and c.startswith("http")]
+
+
+def download(url: str, dest: Path, label: str = "file") -> None:
+    print(f"Downloading {label}: {url}")
+    r = requests.get(url, timeout=300)
+    r.raise_for_status()
+    dest.write_bytes(r.content)
+    print(f"  saved to: {dest}")
+
+
+def submit_market_task(model: str, input_obj: dict, api_key: str) -> dict:
+    """Submit a job to the unified Market createTask endpoint and poll until done."""
+    body = {"model": model, "input": input_obj}
+    created = post("/api/v1/jobs/createTask", body, api_key)
+    task_id = (created.get("data") or {}).get("taskId") or created.get("taskId")
+    if not task_id:
+        raise RuntimeError(f"No taskId in response: {created}")
+    return poll(task_id, api_key)
+
+
 # -------- model handlers --------
 
 def cmd_list(args, api_key):
     print("Available models:")
-    print("  text   - Gemini 3 Flash       (chat / Q&A / summaries)")
-    print("  image  - Flux Kontext Pro     (image generation)")
-    print("  music  - Suno V4              (music generation)")
+    print("  text   - Gemini 3 Flash    (chat / Q&A / summaries)")
+    print("  image  - GPT Image 2       (text-to-image generation)")
+    print("  video  - Wan 2.7           (text-to-video generation)")
+    print("  music  - Suno V4           (music generation)")
 
 
 def cmd_text(args, api_key):
@@ -113,27 +157,41 @@ def cmd_text(args, api_key):
 
 
 def cmd_image(args, api_key):
-    body = {
-        "prompt": args.prompt,
-        "model": "flux-kontext-pro",
-        "aspectRatio": args.aspect,
-        "outputFormat": "jpeg",
-    }
-    created = post("/api/v1/flux/kontext/generate", body, api_key)
-    task_id = created["data"]["taskId"]
-    result = poll(task_id, api_key)
-    info = result.get("info") or result.get("response") or {}
-    urls = info.get("resultUrls") or info.get("imageUrls") or []
-    url = urls[0] if urls else (info.get("imageUrl") or info.get("url"))
-    if not url:
-        print("Couldn't find an output URL. Full payload:")
+    result = submit_market_task(
+        model="gpt-image-2-text-to-image",
+        input_obj={"prompt": args.prompt, "aspect_ratio": args.aspect},
+        api_key=api_key,
+    )
+    urls = extract_urls(result, "imageUrls", "images", "imageUrl", "image")
+    if not urls:
+        print("Couldn't find image URLs. Full payload:")
         print(json.dumps(result, indent=2))
         return
-    print(f"Image URL: {url}")
-    img = requests.get(url, timeout=120).content
-    out = output_path("images", args.prompt, "jpg")
-    out.write_bytes(img)
-    print(f"Saved to: {out}")
+    for i, url in enumerate(urls, start=1):
+        suffix = f"-{i}" if len(urls) > 1 else ""
+        out = output_path("images", f"{args.prompt}{suffix}", "png")
+        download(url, out, label=f"image {i}")
+
+
+def cmd_video(args, api_key):
+    result = submit_market_task(
+        model="wan/2-7-text-to-video",
+        input_obj={
+            "prompt": args.prompt,
+            "resolution": args.resolution,
+            "duration": args.duration,
+        },
+        api_key=api_key,
+    )
+    urls = extract_urls(result, "videoUrls", "videos", "videoUrl", "video")
+    if not urls:
+        print("Couldn't find video URLs. Full payload:")
+        print(json.dumps(result, indent=2))
+        return
+    for i, url in enumerate(urls, start=1):
+        suffix = f"-{i}" if len(urls) > 1 else ""
+        out = output_path("videos", f"{args.prompt}{suffix}", "mp4")
+        download(url, out, label=f"video {i}")
 
 
 def cmd_music(args, api_key):
@@ -144,20 +202,18 @@ def cmd_music(args, api_key):
         "instrumental": False,
     }
     created = post("/api/v1/generate", body, api_key)
-    task_id = created["data"]["taskId"]
+    task_id = (created.get("data") or {}).get("taskId") or created.get("taskId")
+    if not task_id:
+        raise RuntimeError(f"No taskId in Suno response: {created}")
     result = poll(task_id, api_key)
-    info = result.get("info") or result.get("response") or {}
-    audio_urls = info.get("audioUrls") or info.get("resultUrls") or []
-    if not audio_urls:
+    urls = extract_urls(result, "audioUrls", "audios", "audioUrl", "audio")
+    if not urls:
         print("Couldn't find audio URLs. Full payload:")
         print(json.dumps(result, indent=2))
         return
-    for i, url in enumerate(audio_urls, start=1):
-        print(f"Track {i}: {url}")
-        audio = requests.get(url, timeout=180).content
+    for i, url in enumerate(urls, start=1):
         out = output_path("music", f"{args.prompt}-{i}", "mp3")
-        out.write_bytes(audio)
-        print(f"  saved to: {out}")
+        download(url, out, label=f"track {i}")
 
 
 # -------- entry point --------
@@ -172,17 +228,25 @@ def main():
     p_list = sub.add_parser("list", help="Show available models")
     p_list.set_defaults(func=cmd_list)
 
-    p_text = sub.add_parser("text", help="Generate text with Gemini")
+    p_text = sub.add_parser("text", help="Generate text with Gemini 3 Flash")
     p_text.add_argument("prompt")
     p_text.set_defaults(func=cmd_text)
 
-    p_image = sub.add_parser("image", help="Generate an image with Flux Kontext")
+    p_image = sub.add_parser("image", help="Generate an image with GPT Image 2")
     p_image.add_argument("prompt")
-    p_image.add_argument("--aspect", default="1:1",
-                         help="aspect ratio, e.g. 1:1, 16:9, 9:16")
+    p_image.add_argument("--aspect", default="auto",
+                         help="aspect ratio: auto, 1:1, 16:9, 9:16, etc.")
     p_image.set_defaults(func=cmd_image)
 
-    p_music = sub.add_parser("music", help="Generate music with Suno")
+    p_video = sub.add_parser("video", help="Generate a video with Wan 2.7")
+    p_video.add_argument("prompt")
+    p_video.add_argument("--resolution", default="720p",
+                         help="video resolution, e.g. 720p, 1080p")
+    p_video.add_argument("--duration", type=int, default=5,
+                         help="video duration in seconds")
+    p_video.set_defaults(func=cmd_video)
+
+    p_music = sub.add_parser("music", help="Generate music with Suno V4")
     p_music.add_argument("prompt")
     p_music.set_defaults(func=cmd_music)
 
