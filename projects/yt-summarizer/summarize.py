@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-MODEL = "gemini-3.1-flash-lite-preview"
+MODEL = "gemini-2.5-flash-lite"
 
 SUMMARY_PROMPT = """Watch this video carefully and produce a DETAILED summary.
 
