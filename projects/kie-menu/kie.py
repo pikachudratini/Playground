@@ -4,7 +4,7 @@ Lets you call several different AI models on kie.ai through one script:
   - text   -> Gemini 3 Flash       (chat / Q&A / summaries)         [sync]
   - image  -> GPT Image 2          (text-to-image generation)       [async]
   - video  -> Wan 2.7              (text-to-video generation)       [async]
-  - music  -> Suno V4              (music generation)               [async]
+  - music  -> Suno V5              (music generation)               [async]
 
 Usage:
     python kie.py list
@@ -139,7 +139,7 @@ def cmd_list(args, api_key):
     print("  text   - Gemini 3 Flash    (chat / Q&A / summaries)")
     print("  image  - GPT Image 2       (text-to-image generation)")
     print("  video  - Wan 2.7           (text-to-video generation)")
-    print("  music  - Suno V4           (music generation)")
+    print("  music  - Suno V5           (music generation)")
 
 
 def cmd_text(args, api_key):
@@ -197,7 +197,7 @@ def cmd_video(args, api_key):
 def cmd_music(args, api_key):
     body = {
         "prompt": args.prompt,
-        "model": "V4",
+        "model": "V5",
         "customMode": False,
         "instrumental": False,
     }
@@ -246,7 +246,7 @@ def main():
                          help="video duration in seconds")
     p_video.set_defaults(func=cmd_video)
 
-    p_music = sub.add_parser("music", help="Generate music with Suno V4")
+    p_music = sub.add_parser("music", help="Generate music with Suno V5")
     p_music.add_argument("prompt")
     p_music.set_defaults(func=cmd_music)
 
