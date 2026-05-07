@@ -31,9 +31,26 @@ import requests
 from dotenv import load_dotenv
 
 BASE = "https://api.kie.ai"
-OUTPUTS = Path(__file__).with_name("outputs")
 POLL_INTERVAL = 5
 POLL_TIMEOUT = 900  # 15 minutes (video can be slow)
+
+
+def default_outputs() -> Path:
+    """Pick a sensible place for generated files.
+
+    On Termux with shared storage set up (~/storage/downloads exists),
+    save into the phone's Downloads folder so the gallery, file
+    manager, and music player can see the files.
+
+    Otherwise fall back to a local outputs/ folder next to this script.
+    """
+    storage_dl = Path.home() / "storage" / "downloads"
+    if storage_dl.is_dir():
+        return storage_dl / "kie-menu"
+    return Path(__file__).with_name("outputs")
+
+
+OUTPUTS = default_outputs()
 
 
 # -------- helpers --------
