@@ -155,11 +155,16 @@ def cmd_text(args, api_key):
     }
     result = post("/gemini-3-flash/v1/chat/completions", body, api_key)
     text = result["choices"][0]["message"]["content"]
-    out = output_path("text", args.prompt, "md")
-    out.write_text(f"# Prompt\n\n{args.prompt}\n\n# Response\n\n{text}\n")
+    md_out = output_path("text", args.prompt, "md")
+    md_out.write_text(f"# Prompt\n\n{args.prompt}\n\n# Response\n\n{text}\n")
+    # Also save a plain-text version (response only) so other commands
+    # can feed it in via --from-file without markdown headers.
+    txt_out = md_out.with_suffix(".txt")
+    txt_out.write_text(text)
     print("\n--- response ---")
     print(text)
-    print(f"\nSaved to: {out}")
+    print(f"\nSaved to: {md_out}")
+    print(f"Plain text:  {txt_out}")
 
 
 def cmd_image(args, api_key):
@@ -201,12 +206,28 @@ def cmd_video(args, api_key):
 
 
 def cmd_music(args, api_key):
+    # Resolve the prompt -- either from --from-file or the positional arg.
+    prompt = args.prompt
+    if args.from_file:
+        prompt = Path(args.from_file).read_text().strip()
+    if not prompt:
+        print("Error: give a prompt or --from-file <path>", file=sys.stderr)
+        sys.exit(1)
+
     body = {
-        "prompt": args.prompt,
+        "prompt": prompt,
         "model": "V5",
-        "customMode": False,
-        "instrumental": False,
+        "customMode": bool(args.custom),
+        "instrumental": bool(args.instrumental),
     }
+    if args.custom:
+        if not args.style:
+            print("Error: --custom mode requires --style \"...\"", file=sys.stderr)
+            sys.exit(1)
+        body["style"] = args.style
+        if args.title:
+            body["title"] = args.title
+
     created = post("/api/v1/generate", body, api_key)
     task_id = (created.get("data") or {}).get("taskId") or created.get("taskId")
     if not task_id:
@@ -217,8 +238,9 @@ def cmd_music(args, api_key):
         print("Couldn't find audio URLs. Full payload:")
         print(json.dumps(result, indent=2))
         return
+    label_prompt = args.title or prompt[:40]
     for i, url in enumerate(urls, start=1):
-        out = output_path("music", f"{args.prompt}-{i}", "mp3")
+        out = output_path("music", f"{label_prompt}-{i}", "mp3")
         download(url, out, label=f"track {i}")
 
 
@@ -253,7 +275,19 @@ def main():
     p_video.set_defaults(func=cmd_video)
 
     p_music = sub.add_parser("music", help="Generate music with Suno V5")
-    p_music.add_argument("prompt")
+    p_music.add_argument("prompt", nargs="?", default=None,
+                         help="Description (default) or lyrics (--custom)")
+    p_music.add_argument("--from-file", dest="from_file", default=None,
+                         help="Read prompt/lyrics from this file instead")
+    p_music.add_argument("--custom", action="store_true",
+                         help="Custom mode: prompt becomes literal lyrics; "
+                              "requires --style")
+    p_music.add_argument("--style", default=None,
+                         help="Musical style (custom mode only)")
+    p_music.add_argument("--title", default=None,
+                         help="Song title (custom mode, optional)")
+    p_music.add_argument("--instrumental", action="store_true",
+                         help="No vocals")
     p_music.set_defaults(func=cmd_music)
 
     args = parser.parse_args()
