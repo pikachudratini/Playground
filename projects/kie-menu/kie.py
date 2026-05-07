@@ -68,14 +68,22 @@ def poll(task_id: str, api_key: str) -> dict:
     while time.time() - start < POLL_TIMEOUT:
         info = get("/api/v1/jobs/recordInfo", {"taskId": task_id}, api_key)
         data = info.get("data", {}) or {}
-        flag = data.get("successFlag")
-        if flag == 1:
+        state = (data.get("state") or "").lower()
+        if state == "success":
             print("OK: task complete")
+            # kie.ai stores the actual results as a JSON string in
+            # `resultJson`. Parse it so callers can read it normally.
+            raw = data.get("resultJson")
+            if isinstance(raw, str):
+                try:
+                    data["result"] = json.loads(raw)
+                except json.JSONDecodeError:
+                    data["result"] = {}
             return data
-        if flag in (-1, 2, 3):
+        if state in ("fail", "failed", "error"):
             raise RuntimeError(f"Task failed: {info}")
         elapsed = int(time.time() - start)
-        print(f"  still working... ({elapsed}s)")
+        print(f"  still working (state={state or 'pending'}, {elapsed}s)")
         time.sleep(POLL_INTERVAL)
     raise TimeoutError(f"Task {task_id} did not finish in {POLL_TIMEOUT}s")
 
@@ -95,18 +103,16 @@ def output_path(category: str, prompt: str, ext: str) -> Path:
 
 def extract_urls(data: dict, *field_names: str) -> list:
     """Pull URLs out of a kie.ai task result. Different models put them in
-    different fields; we try a few common ones."""
+    different fields; we look in the parsed `result` dict (from resultJson)
+    plus a few common fallback locations."""
     candidates = []
-    for f in field_names:
-        v = data.get(f)
-        if isinstance(v, list):
-            candidates.extend(v)
-        elif isinstance(v, str):
-            candidates.append(v)
-    info = data.get("info") or data.get("response") or {}
-    if isinstance(info, dict):
+    sources = [data, data.get("result") or {}, data.get("info") or {},
+               data.get("response") or {}]
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
         for f in (*field_names, "resultUrls", "outputs", "urls"):
-            v = info.get(f)
+            v = src.get(f)
             if isinstance(v, list):
                 candidates.extend(v)
             elif isinstance(v, str):
