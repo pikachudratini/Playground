@@ -3,6 +3,8 @@
 {% block content %}
 <h1>Disputes &amp; reconciliation review</h1>
 
+<p><a class="btn small" href="{% url 'remittance_create' %}">+ Enter remittance / EFT</a></p>
+
 <h2>Awaiting doctor review ({{ drafted.count }})</h2>
 <div class="card">
 {% if drafted %}

@@ -13,8 +13,10 @@
   </div>
   <p style="margin-bottom:0;">
     <a class="btn small" href="{% url 'check_in' appt.pk %}">Check-in station</a>
+    <a class="btn small" href="{% url 'records_upload' appt.pk %}">Upload records</a>
     <a class="btn small" href="{% url 'log_exam' appt.pk %}">Log exam</a>
     <a class="btn small" href="{% url 'submit_claim' appt.pk %}">Record claim</a>
+    <a class="btn small" href="{% url 'qa_create' appt.pk %}">Add QA</a>
   </p>
 </div>
 
@@ -44,7 +46,8 @@
        Extraction: <span class="badge">{{ records.get_extraction_status_display }}</span></p>
     {% if records.ocr_text %}<p class="muted">{{ records.ocr_text|truncatechars:300 }}</p>{% endif %}
   {% else %}
-    <p class="muted">No records intake recorded. Add via Admin (Phase 2 adds OCR).</p>
+    <p class="muted">No records intake recorded.
+       <a href="{% url 'records_upload' appt.pk %}">Upload a record</a>.</p>
   {% endif %}
 </div>
 
@@ -111,7 +114,8 @@
     {% endfor %}
   </table>
   {% else %}
-    <p class="muted">No QA questionnaires for this appointment.</p>
+    <p class="muted">No QA questionnaires for this appointment.
+       <a href="{% url 'qa_create' appt.pk %}">Add one</a>.</p>
   {% endif %}
 </div>
 {% endblock %}

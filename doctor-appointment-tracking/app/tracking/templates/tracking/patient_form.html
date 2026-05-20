@@ -1,0 +1,14 @@
+{% extends "tracking/base.html" %}
+{% block title %}New patient{% endblock %}
+{% block content %}
+<h1>New patient</h1>
+<div class="card" style="max-width:520px;">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Save patient</button>
+  </form>
+  <p class="muted">Patient details are PHI — handled under the safeguards in
+     <code>../04-hipaa-compliance.md</code>.</p>
+</div>
+{% endblock %}

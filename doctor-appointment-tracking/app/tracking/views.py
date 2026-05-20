@@ -10,11 +10,20 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
-from .forms import ClaimForm, ExamRecordForm
+from .forms import (
+    AppointmentForm,
+    ClaimForm,
+    ExamRecordForm,
+    PatientForm,
+    QAForm,
+    RecordsIntakeForm,
+    RemittanceForm,
+)
 from .models import (
     Appointment,
     CheckIn,
@@ -22,11 +31,15 @@ from .models import (
     Dispute,
     ExamItem,
     ExamRecord,
+    Patient,
+    Payer,
     QAQuestionnaire,
     Reconciliation,
+    RecordsIntake,
     Remittance,
     RemittanceLine,
 )
+from .ocr import extract_text, ocr_available
 from .reconciliation import (
     confirm_line_match,
     early_warning_claims,
@@ -343,3 +356,208 @@ def reconcile_all(request):
         f"flagged {len(overdue)} overdue claim(s).",
     )
     return redirect("dashboard")
+
+
+@login_required
+def patient_create(request):
+    if request.method == "POST":
+        form = PatientForm(request.POST)
+        if form.is_valid():
+            patient = form.save()
+            messages.success(request, "Patient record created.")
+            return redirect(f"{reverse('appointment_create')}?patient={patient.pk}")
+    else:
+        form = PatientForm()
+    return render(request, "tracking/patient_form.html", {"form": form})
+
+
+@login_required
+def appointment_create(request):
+    if request.method == "POST":
+        form = AppointmentForm(request.POST)
+        if form.is_valid():
+            appointment = form.save()
+            messages.success(request, "Appointment created.")
+            return redirect("appointment_detail", pk=appointment.pk)
+    else:
+        initial = {}
+        patient_id = request.GET.get("patient")
+        if patient_id:
+            initial["patient"] = patient_id
+        form = AppointmentForm(initial=initial)
+    return render(
+        request,
+        "tracking/appointment_form.html",
+        {"form": form, "has_patients": Patient.objects.exists()},
+    )
+
+
+@login_required
+def records_upload(request, pk):
+    appointment = get_object_or_404(Appointment, pk=pk)
+    intake = getattr(appointment, "records_intake", None)
+    if request.method == "POST":
+        form = RecordsIntakeForm(
+            request.POST,
+            request.FILES,
+            instance=intake or RecordsIntake(appointment=appointment),
+        )
+        if form.is_valid():
+            intake = form.save(commit=False)
+            intake.appointment = appointment
+            intake.save()
+            text, status = extract_text(intake.document)
+            intake.ocr_text = text
+            intake.extraction_status = status
+            intake.save(update_fields=["ocr_text", "extraction_status"])
+            messages.success(
+                request,
+                f"Records uploaded. OCR: {intake.get_extraction_status_display()}.",
+            )
+            return redirect("appointment_detail", pk=appointment.pk)
+    else:
+        form = RecordsIntakeForm(instance=intake)
+    return render(
+        request,
+        "tracking/records_upload.html",
+        {
+            "appt": appointment,
+            "form": form,
+            "intake": intake,
+            "ocr_available": ocr_available(),
+        },
+    )
+
+
+@login_required
+def qa_create(request, pk):
+    appointment = get_object_or_404(Appointment, pk=pk)
+    if request.method == "POST":
+        form = QAForm(request.POST)
+        if form.is_valid():
+            qa = form.save(commit=False)
+            qa.appointment = appointment
+            qa.save()
+            messages.success(request, "QA questionnaire added.")
+            return redirect("appointment_detail", pk=appointment.pk)
+    else:
+        form = QAForm(initial={"received_date": timezone.localdate()})
+    return render(
+        request, "tracking/qa_form.html", {"appt": appointment, "form": form}
+    )
+
+
+@login_required
+def remittance_create(request):
+    if request.method == "POST":
+        form = RemittanceForm(request.POST, request.FILES)
+        if form.is_valid():
+            remittance = form.save(commit=False)
+            numbers = request.POST.getlist("line_number")
+            amounts = request.POST.getlist("line_amount")
+            parsed = []
+            total = Decimal("0.00")
+            for number, amount in zip(numbers, amounts):
+                number, amount = number.strip(), amount.strip()
+                if not number or not amount:
+                    continue
+                try:
+                    value = Decimal(amount)
+                except InvalidOperation:
+                    continue
+                parsed.append((number, value))
+                total += value
+            remittance.total_amount = total
+            remittance.save()
+            for number, value in parsed:
+                RemittanceLine.objects.create(
+                    remittance=remittance,
+                    patient_number_on_eft=number,
+                    amount_paid=value,
+                )
+            reconcile_remittance(remittance)
+            messages.success(
+                request,
+                f"Remittance saved with {len(parsed)} line(s) and reconciled.",
+            )
+            return redirect("disputes")
+    else:
+        form = RemittanceForm(initial={"received_date": timezone.localdate()})
+    return render(request, "tracking/remittance_form.html", {"form": form})
+
+
+@login_required
+def reports(request):
+    reconciliations = Reconciliation.objects.all()
+    by_result = []
+    for value, label in Reconciliation.Result.choices:
+        subset = reconciliations.filter(result=value)
+        by_result.append(
+            {
+                "label": label,
+                "count": subset.count(),
+                "variance": subset.aggregate(s=Sum("variance"))["s"]
+                or Decimal("0.00"),
+            }
+        )
+    total_expected = reconciliations.aggregate(s=Sum("expected_amount"))["s"] or Decimal(
+        "0.00"
+    )
+    total_paid = reconciliations.aggregate(s=Sum("paid_amount"))["s"] or Decimal("0.00")
+    outstanding = reconciliations.exclude(
+        result__in=[Reconciliation.Result.MATCHED, Reconciliation.Result.OVERPAID]
+    ).aggregate(s=Sum("variance"))["s"] or Decimal("0.00")
+    recovered = Dispute.objects.filter(
+        status=Dispute.Status.RESOLVED
+    ).aggregate(s=Sum("amount_recovered"))["s"] or Decimal("0.00")
+
+    qas = list(QAQuestionnaire.objects.all())
+    qa_completed = sum(
+        1 for q in qas if q.status == QAQuestionnaire.Status.COMPLETED
+    )
+    qa_overdue = sum(1 for q in qas if q.is_overdue)
+
+    waits = [
+        a.wait_minutes
+        for a in Appointment.objects.all()
+        if a.wait_minutes is not None
+    ]
+    durations = [
+        a.exam_duration_minutes
+        for a in Appointment.objects.all()
+        if a.exam_duration_minutes is not None
+    ]
+
+    payer_rows = []
+    for payer in Payer.objects.all():
+        subset = reconciliations.filter(appointment__payer=payer)
+        payer_rows.append(
+            {
+                "payer": payer.name,
+                "expected": subset.aggregate(s=Sum("expected_amount"))["s"]
+                or Decimal("0.00"),
+                "paid": subset.aggregate(s=Sum("paid_amount"))["s"]
+                or Decimal("0.00"),
+            }
+        )
+
+    return render(
+        request,
+        "tracking/reports.html",
+        {
+            "by_result": by_result,
+            "total_expected": total_expected,
+            "total_paid": total_paid,
+            "outstanding": outstanding,
+            "recovered": recovered,
+            "reconciled_count": reconciliations.count(),
+            "qa_total": len(qas),
+            "qa_completed": qa_completed,
+            "qa_overdue": qa_overdue,
+            "avg_wait": round(sum(waits) / len(waits)) if waits else None,
+            "avg_duration": round(sum(durations) / len(durations))
+            if durations
+            else None,
+            "payer_rows": payer_rows,
+        },
+    )

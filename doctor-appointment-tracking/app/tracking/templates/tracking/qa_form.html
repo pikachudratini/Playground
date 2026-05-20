@@ -1,0 +1,14 @@
+{% extends "tracking/base.html" %}
+{% block title %}Add QA questionnaire{% endblock %}
+{% block content %}
+<p><a href="{% url 'appointment_detail' appt.pk %}">&larr; Back to appointment</a></p>
+<h1>Add QA questionnaire</h1>
+<p class="muted">{{ appt.patient.full_name }} &middot; #{{ appt.patient.canonical_patient_number }}</p>
+<div class="card" style="max-width:520px;">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Save QA questionnaire</button>
+  </form>
+</div>
+{% endblock %}

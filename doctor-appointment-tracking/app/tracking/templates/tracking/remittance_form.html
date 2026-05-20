@@ -1,0 +1,37 @@
+{% extends "tracking/base.html" %}
+{% block title %}Enter remittance{% endblock %}
+{% block content %}
+<h1>Enter remittance / EFT</h1>
+<p class="muted">Enter each payment line as it appears on the EFT — the patient
+   number and the amount. Saving runs reconciliation automatically.</p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="card" style="max-width:560px;">
+    {{ form.as_p }}
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0;">Payment lines</h2>
+    <table id="lines">
+      <tr><th>Patient # on EFT</th><th>Amount paid ($)</th></tr>
+      {% for i in "123" %}
+      <tr>
+        <td><input type="text" name="line_number"></td>
+        <td><input type="text" name="line_amount" placeholder="0.00"></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p><button type="button" class="btn sec small" id="add-line">+ Add line</button></p>
+  </div>
+  <p><button type="submit" class="btn">Save &amp; reconcile</button></p>
+</form>
+
+<script>
+document.getElementById('add-line').addEventListener('click', function(){
+  var table=document.getElementById('lines');
+  var row=table.rows[table.rows.length-1].cloneNode(true);
+  row.querySelectorAll('input').forEach(function(i){ i.value=''; });
+  table.appendChild(row);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "tracking/base.html" %}
+{% block title %}New appointment{% endblock %}
+{% block content %}
+<h1>New appointment</h1>
+{% if not has_patients %}
+<div class="msg error">No patients yet —
+  <a href="{% url 'patient_create' %}">create a patient first</a>.</div>
+{% endif %}
+<div class="card" style="max-width:520px;">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Create appointment</button>
+  </form>
+  <p class="muted">Need a new patient? <a href="{% url 'patient_create' %}">Add one</a>.</p>
+</div>
+{% endblock %}

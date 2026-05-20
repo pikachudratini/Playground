@@ -1,4 +1,7 @@
 Django>=5.2,<5.3
 Pillow>=10.0
+# Local OCR for scanned records (Phase 2). Also requires the system
+# package "tesseract-ocr". If absent, OCR is skipped gracefully.
+pytesseract>=0.3.10
 # PostgreSQL driver — needed only when the DB_* environment variables are set.
 psycopg[binary]>=3.1

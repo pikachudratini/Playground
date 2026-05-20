@@ -1,0 +1,49 @@
+{% extends "tracking/base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h1>Reports</h1>
+
+<div class="grid">
+  <div class="stat"><div class="n">${{ total_expected|floatformat:2 }}</div><div class="l">Total expected</div></div>
+  <div class="stat"><div class="n">${{ total_paid|floatformat:2 }}</div><div class="l">Total paid</div></div>
+  <div class="stat"><div class="n">${{ outstanding|floatformat:2 }}</div><div class="l">Outstanding</div></div>
+  <div class="stat"><div class="n">${{ recovered|floatformat:2 }}</div><div class="l">Recovered</div></div>
+</div>
+
+<h2>Reconciliation outcomes</h2>
+<div class="card">
+<table>
+  <tr><th>Result</th><th>Count</th><th class="right">Variance</th></tr>
+  {% for r in by_result %}
+  <tr><td>{{ r.label }}</td><td>{{ r.count }}</td>
+      <td class="right">${{ r.variance|floatformat:2 }}</td></tr>
+  {% endfor %}
+</table>
+<p class="muted">{{ reconciled_count }} appointment(s) reconciled.</p>
+</div>
+
+<h2>By payer</h2>
+<div class="card">
+<table>
+  <tr><th>Payer</th><th class="right">Expected</th><th class="right">Paid</th></tr>
+  {% for p in payer_rows %}
+  <tr><td>{{ p.payer }}</td>
+      <td class="right">${{ p.expected|floatformat:2 }}</td>
+      <td class="right">${{ p.paid|floatformat:2 }}</td></tr>
+  {% empty %}
+  <tr><td colspan="3" class="muted">No payers yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<h2>QA &amp; operations</h2>
+<div class="card">
+  <p>QA questionnaires: <strong>{{ qa_total }}</strong> total &middot;
+     {{ qa_completed }} completed &middot;
+     <span class="{% if qa_overdue %}badge bad{% endif %}">{{ qa_overdue }} overdue</span></p>
+  <p>Average wait time:
+     {% if avg_wait != None %}<strong>{{ avg_wait }} min</strong>{% else %}-{% endif %}
+     &middot; Average exam duration:
+     {% if avg_duration != None %}<strong>{{ avg_duration }} min</strong>{% else %}-{% endif %}</p>
+</div>
+{% endblock %}

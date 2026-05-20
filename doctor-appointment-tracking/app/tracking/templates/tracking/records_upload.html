@@ -1,0 +1,30 @@
+{% extends "tracking/base.html" %}
+{% block title %}Records intake{% endblock %}
+{% block content %}
+<p><a href="{% url 'appointment_detail' appt.pk %}">&larr; Back to appointment</a></p>
+<h1>Medical records intake</h1>
+<p class="muted">{{ appt.patient.full_name }} &middot; #{{ appt.patient.canonical_patient_number }}</p>
+
+<div class="card" style="max-width:560px;">
+  {% if ocr_available %}
+    <p><span class="badge good">Local OCR available</span>
+       Uploaded images are text-extracted on this machine — no data leaves the office.</p>
+  {% else %}
+    <p><span class="badge warn">Local OCR not available</span>
+       The file is stored; text extraction is skipped.</p>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Upload &amp; extract</button>
+  </form>
+  {% if intake %}
+    <p class="muted" style="margin-top:1rem;">Current status:
+       <span class="badge">{{ intake.get_extraction_status_display }}</span></p>
+    {% if intake.ocr_text %}
+      <h2>Extracted text</h2>
+      <pre class="email">{{ intake.ocr_text }}</pre>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

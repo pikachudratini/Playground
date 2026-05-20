@@ -3,6 +3,12 @@
 {% block content %}
 <h1>Appointments</h1>
 
+<p>
+  <a class="btn small" href="{% url 'appointment_create' %}">+ New appointment</a>
+  <a class="btn small sec" href="{% url 'patient_create' %}">+ New patient</a>
+  <a class="btn small sec" href="{% url 'remittance_create' %}">+ Enter remittance</a>
+</p>
+
 <div class="pill-nav">
   <a href="{% url 'appointments' %}" class="{% if not status %}on{% endif %}">All</a>
   {% for value, label in statuses %}

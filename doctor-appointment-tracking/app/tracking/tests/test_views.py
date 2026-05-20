@@ -1,11 +1,21 @@
+import tempfile
 from datetime import timedelta
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from tracking import models
+
+
+def _png_upload():
+    buffer = BytesIO()
+    Image.new("RGB", (60, 30), "white").save(buffer, format="PNG")
+    return SimpleUploadedFile("record.png", buffer.getvalue(), content_type="image/png")
 
 PASSWORD = "staff-pw-strong-2026"
 
@@ -83,3 +93,72 @@ class ViewTests(TestCase):
             self.appointment.status, models.Appointment.Status.COMPLETED
         )
         self.assertEqual(self.appointment.exam_record.items.count(), 2)
+
+    def test_reports_loads(self):
+        self.assertEqual(self.client.get(reverse("reports")).status_code, 200)
+
+    def test_patient_create(self):
+        response = self.client.post(
+            reverse("patient_create"),
+            {"full_name": "New Patient", "canonical_patient_number": "400001"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            models.Patient.objects.filter(canonical_patient_number="400001").exists()
+        )
+
+    def test_appointment_create(self):
+        response = self.client.post(
+            reverse("appointment_create"),
+            {
+                "patient": self.patient.pk,
+                "payer": self.payer.pk,
+                "scheduled_datetime": timezone.localtime().strftime(
+                    "%Y-%m-%dT%H:%M"
+                ),
+                "exam_type": "Disability exam",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.patient.appointments.count(), 2)
+
+    def test_qa_create(self):
+        today = timezone.localdate()
+        response = self.client.post(
+            reverse("qa_create", args=[self.appointment.pk]),
+            {
+                "received_date": today.isoformat(),
+                "deadline": (today + timedelta(days=14)).isoformat(),
+                "status": models.QAQuestionnaire.Status.OPEN,
+                "time_spent_minutes": 0,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.appointment.qa_questionnaires.count(), 1)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_records_upload(self):
+        url = reverse("records_upload", args=[self.appointment.pk])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        response = self.client.post(
+            url, {"source": "paper_scan", "document": _png_upload()}
+        )
+        self.assertRedirects(
+            response, reverse("appointment_detail", args=[self.appointment.pk])
+        )
+        self.appointment.refresh_from_db()
+        self.assertIsNotNone(self.appointment.records_intake.document.name)
+
+    def test_remittance_create_and_reconcile(self):
+        response = self.client.post(
+            reverse("remittance_create"),
+            {
+                "payer": self.payer.pk,
+                "received_date": timezone.localdate().isoformat(),
+                "line_number": ["300001", ""],
+                "line_amount": ["250.00", ""],
+            },
+        )
+        self.assertRedirects(response, reverse("disputes"))
+        remittance = models.Remittance.objects.latest("id")
+        self.assertEqual(remittance.lines.count(), 1)
