@@ -1,0 +1,24 @@
+{% extends "tracking/base.html" %}
+{% block title %}Record claim{% endblock %}
+{% block content %}
+<p><a href="{% url 'appointment_detail' appt.pk %}">&larr; Back to appointment</a></p>
+<h1>Record claim: {{ appt.patient.full_name }}</h1>
+<p class="muted">Office patient number: #{{ appt.patient.canonical_patient_number }}.
+   The submitted number is stored separately so mismatches can be detected.</p>
+
+<form method="post">
+{% csrf_token %}
+<div class="card" style="max-width:520px;">
+  <label>Date submitted</label>
+  {{ form.submitted_date }}
+  <label>Patient number used on the submission</label>
+  {{ form.submitted_patient_number }}
+  <label>Services claimed</label>
+  {{ form.services_claimed }}
+  <label>Expected amount ($)</label>
+  {{ form.expected_amount }}
+  {% if form.errors %}<div class="msg error">Please correct the fields above.</div>{% endif %}
+  <p style="margin-bottom:0;"><button type="submit" class="btn">Save claim</button></p>
+</div>
+</form>
+{% endblock %}

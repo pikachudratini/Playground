@@ -1,0 +1,72 @@
+{% extends "tracking/base.html" %}
+{% block title %}Disputes{% endblock %}
+{% block content %}
+<h1>Disputes &amp; reconciliation review</h1>
+
+<h2>Awaiting doctor review ({{ drafted.count }})</h2>
+<div class="card">
+{% if drafted %}
+<table>
+  <tr><th>Patient</th><th>Result</th><th class="right">Outstanding</th><th></th></tr>
+  {% for d in drafted %}
+  <tr>
+    <td>{{ d.reconciliation.appointment.patient.full_name }}</td>
+    <td><span class="badge bad">{{ d.reconciliation.get_result_display }}</span></td>
+    <td class="right">${{ d.reconciliation.variance }}</td>
+    <td><a class="btn small" href="{% url 'dispute_detail' d.pk %}">Review &amp; send</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">No drafts waiting.</p>{% endif %}
+</div>
+
+{% if fuzzy_lines %}
+<h2>Patient-number mismatches needing confirmation</h2>
+<div class="card">
+<table>
+  <tr><th>EFT patient #</th><th>Amount</th><th>Closest appointment</th><th></th></tr>
+  {% for line in fuzzy_lines %}
+  <tr>
+    <td>{{ line.patient_number_on_eft }}</td>
+    <td>${{ line.amount_paid }}</td>
+    <td>{% if line.suggested_appointment %}{{ line.suggested_appointment.patient.full_name }}
+        (#{{ line.suggested_appointment.patient.canonical_patient_number }}){% else %}-{% endif %}</td>
+    <td>
+      <form method="post" action="{% url 'confirm_line' line.pk %}">{% csrf_token %}
+        <button type="submit" class="btn small">Confirm match</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Confirming applies the match and re-reconciles with the real amount.</p>
+</div>
+{% endif %}
+
+{% if unmatched_lines %}
+<h2>Unmatched payment lines</h2>
+<div class="card">
+<table>
+  <tr><th>EFT patient #</th><th>Amount</th><th>Remittance</th></tr>
+  {% for line in unmatched_lines %}
+  <tr><td>{{ line.patient_number_on_eft }}</td><td>${{ line.amount_paid }}</td>
+      <td>{{ line.remittance }}</td></tr>
+  {% endfor %}
+</table>
+<p class="muted">No appointment could be matched. Investigate via the Admin.</p>
+</div>
+{% endif %}
+
+<h2>Sent ({{ sent.count }}) &middot; Resolved ({{ resolved.count }}) &middot; Escalated ({{ escalated.count }})</h2>
+<div class="card">
+<table>
+  <tr><th>Patient</th><th>Status</th><th class="right">Recovered</th><th></th></tr>
+  {% for d in sent %}{% include "tracking/_dispute_row.html" %}{% endfor %}
+  {% for d in escalated %}{% include "tracking/_dispute_row.html" %}{% endfor %}
+  {% for d in resolved %}{% include "tracking/_dispute_row.html" %}{% endfor %}
+  {% if not sent and not resolved and not escalated %}
+  <tr><td colspan="4" class="muted">Nothing sent yet.</td></tr>
+  {% endif %}
+</table>
+</div>
+{% endblock %}

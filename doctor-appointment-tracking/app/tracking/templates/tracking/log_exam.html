@@ -1,0 +1,66 @@
+{% extends "tracking/base.html" %}
+{% block title %}Log exam{% endblock %}
+{% block content %}
+<p><a href="{% url 'appointment_detail' appt.pk %}">&larr; Back to appointment</a></p>
+<h1>Log exam: {{ appt.patient.full_name }}</h1>
+
+<form method="post">
+{% csrf_token %}
+<div class="card">
+  <div class="row">
+    <div style="flex:1;min-width:220px;">
+      <label>Exam started</label>
+      <input type="datetime-local" name="exam_started_at"
+             value="{% if appt.exam_started_at %}{{ appt.exam_started_at|date:'Y-m-d\TH:i' }}{% else %}{{ now_value }}{% endif %}">
+    </div>
+    <div style="flex:1;min-width:220px;">
+      <label>Exam ended</label>
+      <input type="datetime-local" name="exam_ended_at"
+             value="{% if appt.exam_ended_at %}{{ appt.exam_ended_at|date:'Y-m-d\TH:i' }}{% else %}{{ now_value }}{% endif %}">
+    </div>
+  </div>
+  <label>Conditions examined</label>
+  {{ form.conditions_examined }}
+  <label>Notes</label>
+  {{ form.notes }}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">DBQs &amp; IMOs performed</h2>
+  <p class="muted">Each row is one procedure. Fees are looked up from the payer's
+     fee schedule when saved.</p>
+  <table id="items">
+    <tr><th>Type</th><th>Description</th></tr>
+    {% for item in exam.items.all %}
+    <tr>
+      <td><select name="item_type">
+        <option value="">-</option>
+        {% for v, l in item_types %}<option value="{{ v }}" {% if item.item_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select></td>
+      <td><input type="text" name="item_description" value="{{ item.description }}"></td>
+    </tr>
+    {% endfor %}
+    <tr>
+      <td><select name="item_type"><option value="">-</option>
+        {% for v, l in item_types %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+      </select></td>
+      <td><input type="text" name="item_description" placeholder="e.g. Knee DBQ"></td>
+    </tr>
+  </table>
+  <p><button type="button" class="btn sec small" id="add-row">+ Add row</button></p>
+</div>
+
+<p><button type="submit" class="btn">Save exam</button></p>
+</form>
+
+<script>
+document.getElementById('add-row').addEventListener('click', function(){
+  var table=document.getElementById('items');
+  var last=table.rows[table.rows.length-1];
+  var clone=last.cloneNode(true);
+  clone.querySelector('select').value='';
+  clone.querySelector('input').value='';
+  table.appendChild(clone);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,4 @@
+Django>=5.2,<5.3
+Pillow>=10.0
+# PostgreSQL driver — needed only when the DB_* environment variables are set.
+psycopg[binary]>=3.1

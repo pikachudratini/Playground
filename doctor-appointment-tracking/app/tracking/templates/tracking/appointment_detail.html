@@ -1,0 +1,117 @@
+{% extends "tracking/base.html" %}
+{% block title %}{{ appt.patient.full_name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'appointments' %}">&larr; Appointments</a></p>
+<h1>{{ appt.patient.full_name }} <span class="muted">#{{ appt.patient.canonical_patient_number }}</span></h1>
+
+<div class="card">
+  <div class="row">
+    <div><strong>Payer:</strong> {{ appt.payer.name }}</div>
+    <div><strong>Scheduled:</strong> {{ appt.scheduled_datetime|date:"Y-m-d H:i" }}</div>
+    <div><strong>Status:</strong> <span class="badge">{{ appt.get_status_display }}</span></div>
+    {% if appt.exam_type %}<div><strong>Type:</strong> {{ appt.exam_type }}</div>{% endif %}
+  </div>
+  <p style="margin-bottom:0;">
+    <a class="btn small" href="{% url 'check_in' appt.pk %}">Check-in station</a>
+    <a class="btn small" href="{% url 'log_exam' appt.pk %}">Log exam</a>
+    <a class="btn small" href="{% url 'submit_claim' appt.pk %}">Record claim</a>
+  </p>
+</div>
+
+<h2>Check-in</h2>
+<div class="card">
+  {% if check_in %}
+    <p>Arrived <strong>{{ check_in.arrival_timestamp|date:"Y-m-d H:i" }}</strong>,
+       checked in by {{ check_in.checked_in_by|default:"-" }}.</p>
+    <p>
+      Photo consent: {% if check_in.photo_consent %}<span class="badge good">yes</span>{% else %}<span class="badge warn">no</span>{% endif %}
+      &nbsp; Arrival photo: {% if check_in.arrival_photo %}<span class="badge good">on file</span>{% else %}<span class="badge">none</span>{% endif %}
+      &nbsp; Signature: {% if check_in.signature %}<span class="badge good">on file</span>{% else %}<span class="badge">none</span>{% endif %}
+    </p>
+    <div class="row">
+      {% if check_in.arrival_photo %}<img src="{{ check_in.arrival_photo.url }}" alt="arrival photo" style="max-height:150px;border:1px solid var(--line);border-radius:6px;">{% endif %}
+      {% if check_in.signature %}<img src="{{ check_in.signature.url }}" alt="signature" style="max-height:90px;border:1px solid var(--line);border-radius:6px;background:#fff;">{% endif %}
+    </div>
+  {% else %}
+    <p class="muted">Not checked in yet.</p>
+  {% endif %}
+</div>
+
+<h2>Medical records intake</h2>
+<div class="card">
+  {% if records %}
+    <p>Source: {{ records.get_source_display }} &middot;
+       Extraction: <span class="badge">{{ records.get_extraction_status_display }}</span></p>
+    {% if records.ocr_text %}<p class="muted">{{ records.ocr_text|truncatechars:300 }}</p>{% endif %}
+  {% else %}
+    <p class="muted">No records intake recorded. Add via Admin (Phase 2 adds OCR).</p>
+  {% endif %}
+</div>
+
+<h2>Exam</h2>
+<div class="card">
+  {% if exam %}
+    <p>Examiner: {{ exam.examiner|default:"-" }} &middot;
+       Wait time: {% if appt.wait_minutes != None %}{{ appt.wait_minutes }} min{% else %}-{% endif %} &middot;
+       Duration: {% if appt.exam_duration_minutes != None %}{{ appt.exam_duration_minutes }} min{% else %}-{% endif %}</p>
+    {% if exam.conditions_examined %}<p><strong>Conditions:</strong> {{ exam.conditions_examined }}</p>{% endif %}
+    <table>
+      <tr><th>Type</th><th>Description</th><th class="right">Expected fee</th></tr>
+      {% for item in exam.items.all %}
+      <tr><td><span class="badge">{{ item.get_item_type_display }}</span></td>
+          <td>{{ item.description }}</td><td class="right">${{ item.expected_fee }}</td></tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p class="muted">No exam logged yet.</p>
+  {% endif %}
+</div>
+
+<h2>Claim</h2>
+<div class="card">
+  {% if claim %}
+    <p>Submitted {{ claim.submitted_date }} as patient #{{ claim.submitted_patient_number }}
+       {% if claim.patient_number_mismatch %}<span class="badge bad">differs from office #{{ appt.patient.canonical_patient_number }}</span>{% endif %}
+    </p>
+    <p><strong>Expected amount:</strong> ${{ claim.expected_amount }}</p>
+  {% else %}
+    <p class="muted">No claim recorded yet.</p>
+  {% endif %}
+</div>
+
+<h2>Reconciliation</h2>
+<div class="card">
+  {% if reconciliation %}
+    <p><span class="badge {% if reconciliation.result == 'matched' %}good{% elif reconciliation.result == 'overpaid' %}warn{% else %}bad{% endif %}">{{ reconciliation.get_result_display }}</span>
+       &nbsp; checked {{ reconciliation.checked_at|date:"Y-m-d H:i" }}</p>
+    <p>Expected ${{ reconciliation.expected_amount }} &middot;
+       Paid ${{ reconciliation.paid_amount }} &middot;
+       Variance <strong>${{ reconciliation.variance }}</strong></p>
+    {% if reconciliation.note %}<p class="muted">{{ reconciliation.note }}</p>{% endif %}
+    {% if dispute %}
+      <p><a class="btn small" href="{% url 'dispute_detail' dispute.pk %}">View dispute draft ({{ dispute.get_status_display }})</a></p>
+    {% endif %}
+  {% else %}
+    <p class="muted">Not reconciled yet. Enter a remittance and run reconciliation.</p>
+  {% endif %}
+</div>
+
+<h2>QA questionnaires</h2>
+<div class="card">
+  {% if qas %}
+  <table>
+    <tr><th>Received</th><th>Deadline</th><th>Status</th><th>Time spent</th></tr>
+    {% for q in qas %}
+    <tr>
+      <td>{{ q.received_date }}</td>
+      <td>{{ q.deadline }} {% if q.is_overdue %}<span class="badge bad">overdue</span>{% endif %}</td>
+      <td>{{ q.get_status_display }}</td>
+      <td>{{ q.time_spent_minutes }} min</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p class="muted">No QA questionnaires for this appointment.</p>
+  {% endif %}
+</div>
+{% endblock %}

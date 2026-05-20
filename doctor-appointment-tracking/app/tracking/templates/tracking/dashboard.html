@@ -1,0 +1,75 @@
+{% extends "tracking/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="grid">
+  <div class="stat"><div class="n">{{ total_appointments }}</div><div class="l">Appointments tracked</div></div>
+  <div class="stat"><div class="n">${{ outstanding|floatformat:2 }}</div><div class="l">Outstanding (disputed)</div></div>
+  <div class="stat"><div class="n">${{ recovered|floatformat:2 }}</div><div class="l">Recovered to date</div></div>
+  <div class="stat"><div class="n">{{ disputes_drafted }}</div><div class="l">Disputes awaiting review</div></div>
+  <div class="stat"><div class="n">{{ open_qa_count }}</div><div class="l">Open QA questionnaires</div></div>
+  <div class="stat"><div class="n">{{ overdue_qa_count }}</div><div class="l">Overdue QAs</div></div>
+</div>
+
+<div class="card">
+  <form method="post" action="{% url 'reconcile_all' %}">{% csrf_token %}
+    <button type="submit" class="btn">Run reconciliation &amp; overdue check</button>
+    <span class="muted">&nbsp;Matches payments, flags underpayments, and re-checks
+      claims older than the overdue window. {{ early_warning_count }} claim(s)
+      currently past the early-warning window.</span>
+  </form>
+</div>
+
+<h2>Appointments by status</h2>
+<div class="card">
+  <div class="pill-nav">
+    {% for s in status_summary %}
+      <span class="badge">{{ s.label }}: {{ s.count }}</span>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="row">
+  <div class="card" style="flex:1; min-width:320px;">
+    <h2 style="margin-top:0;">Payments needing attention ({{ needs_attention_count }})</h2>
+    {% if needs_attention %}
+    <table>
+      <tr><th>Patient</th><th>Result</th><th class="right">Outstanding</th></tr>
+      {% for r in needs_attention %}
+      <tr>
+        <td><a href="{% url 'appointment_detail' r.appointment.pk %}">{{ r.appointment.patient.full_name }}</a></td>
+        <td><span class="badge bad">{{ r.get_result_display }}</span></td>
+        <td class="right">${{ r.variance }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p><a href="{% url 'disputes' %}">Go to the disputes queue &rarr;</a></p>
+    {% else %}
+    <p class="muted">Nothing flagged. Run reconciliation after entering payments.</p>
+    {% endif %}
+  </div>
+
+  <div class="card" style="flex:1; min-width:320px;">
+    <h2 style="margin-top:0;">QA worklist (by deadline)</h2>
+    {% if qa_worklist %}
+    <table>
+      <tr><th>Patient</th><th>Deadline</th><th>Status</th></tr>
+      {% for q in qa_worklist %}
+      <tr>
+        <td><a href="{% url 'appointment_detail' q.appointment.pk %}">{{ q.appointment.patient.full_name }}</a></td>
+        <td>{{ q.deadline }}
+          {% if q.is_overdue %}<span class="badge bad">overdue</span>
+          {% elif q.days_until_deadline <= 3 %}<span class="badge warn">{{ q.days_until_deadline }}d</span>
+          {% else %}<span class="muted">{{ q.days_until_deadline }}d</span>{% endif %}
+        </td>
+        <td>{{ q.get_status_display }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No open QA questionnaires.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

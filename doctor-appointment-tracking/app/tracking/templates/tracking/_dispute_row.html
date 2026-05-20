@@ -1,0 +1,6 @@
+<tr>
+  <td>{{ d.reconciliation.appointment.patient.full_name }}</td>
+  <td><span class="badge">{{ d.get_status_display }}</span></td>
+  <td class="right">${{ d.amount_recovered }}</td>
+  <td><a class="btn small" href="{% url 'dispute_detail' d.pk %}">Open</a></td>
+</tr>

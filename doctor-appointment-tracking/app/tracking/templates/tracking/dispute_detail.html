@@ -1,0 +1,51 @@
+{% extends "tracking/base.html" %}
+{% block title %}Dispute{% endblock %}
+{% block content %}
+<p><a href="{% url 'disputes' %}">&larr; Disputes</a></p>
+<h1>Dispute draft</h1>
+<p class="muted">
+  <a href="{% url 'appointment_detail' appt.pk %}">{{ appt.patient.full_name }}</a>
+  &middot; {{ appt.scheduled_datetime|date:"Y-m-d" }}
+  &middot; <span class="badge">{{ dispute.get_status_display }}</span>
+</p>
+
+<div class="card">
+  <h2 style="margin-top:0;">Reconciliation</h2>
+  <p><span class="badge bad">{{ dispute.reconciliation.get_result_display }}</span></p>
+  <p>Expected ${{ dispute.reconciliation.expected_amount }} &middot;
+     Paid ${{ dispute.reconciliation.paid_amount }} &middot;
+     Outstanding <strong>${{ dispute.reconciliation.variance }}</strong></p>
+  {% if dispute.reconciliation.note %}<p class="muted">{{ dispute.reconciliation.note }}</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Draft email — review before sending</h2>
+  <p><strong>Subject:</strong> {{ dispute.draft_subject }}</p>
+  <pre class="email">{{ dispute.draft_email_body }}</pre>
+  <p class="muted">Dispute emails contain PHI — send via a secure email channel
+     with a BAA, or the payer's portal. The system never sends automatically.</p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Actions</h2>
+  {% if dispute.status == 'drafted' %}
+  <form method="post" action="{% url 'dispute_mark' dispute.pk 'sent' %}" style="display:inline;">
+    {% csrf_token %}<button type="submit" class="btn">Mark as sent</button>
+  </form>
+  {% endif %}
+  {% if dispute.status == 'sent' %}
+  <form method="post" action="{% url 'dispute_mark' dispute.pk 'resolved' %}" style="display:inline;">
+    {% csrf_token %}
+    <input type="text" name="amount_recovered" placeholder="Amount recovered"
+           style="width:140px;display:inline;">
+    <button type="submit" class="btn">Mark resolved</button>
+  </form>
+  <form method="post" action="{% url 'dispute_mark' dispute.pk 'escalated' %}" style="display:inline;">
+    {% csrf_token %}<button type="submit" class="btn sec">Escalate</button>
+  </form>
+  {% endif %}
+  {% if dispute.sent_date %}<p class="muted">Sent {{ dispute.sent_date }};
+     response due {{ dispute.response_due_date }}.</p>{% endif %}
+  {% if dispute.status == 'resolved' %}<p class="badge good">Recovered ${{ dispute.amount_recovered }}</p>{% endif %}
+</div>
+{% endblock %}

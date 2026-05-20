@@ -1,0 +1,13 @@
+# Local runtime artifacts — never commit these.
+.venv/
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+__pycache__/
+*.pyc
+.env
+
+# Patient data and backups must never enter version control (see ../04-hipaa-compliance.md).
+*.backup
+*.dump

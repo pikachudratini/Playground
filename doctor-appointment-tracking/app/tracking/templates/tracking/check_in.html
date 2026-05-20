@@ -1,0 +1,87 @@
+{% extends "tracking/base.html" %}
+{% block title %}Check-in{% endblock %}
+{% block content %}
+<p><a href="{% url 'appointment_detail' appt.pk %}">&larr; Back to appointment</a></p>
+<h1>Check-in station</h1>
+<p class="muted">{{ appt.patient.full_name }} &middot; #{{ appt.patient.canonical_patient_number }}
+   &middot; {{ appt.payer.name }} &middot; {{ appt.scheduled_datetime|date:"Y-m-d H:i" }}</p>
+
+<form method="post" enctype="multipart/form-data" id="checkin-form">
+{% csrf_token %}
+<div class="row">
+  <div class="card" style="flex:1;min-width:300px;">
+    <h2 style="margin-top:0;">Arrival photo</h2>
+    <video id="cam" autoplay playsinline muted
+           style="width:100%;max-width:320px;background:#000;border-radius:6px;"></video>
+    <canvas id="snap" style="display:none;"></canvas>
+    <div id="photo-preview"></div>
+    <p>
+      <button type="button" class="btn sec small" id="start-cam">Start camera</button>
+      <button type="button" class="btn small" id="capture" disabled>Capture photo</button>
+    </p>
+    <p class="muted" id="cam-msg">No camera? Upload a photo of the patient instead:</p>
+    <input type="file" name="arrival_photo_file" accept="image/*">
+    <input type="hidden" name="arrival_photo_data" id="arrival_photo_data">
+  </div>
+
+  <div class="card" style="flex:1;min-width:300px;">
+    <h2 style="margin-top:0;">Patient signature &amp; consent</h2>
+    <p class="muted">By signing, the patient confirms they arrived for this
+       appointment and consents to an arrival photo being taken and stored.</p>
+    <canvas id="sigpad" width="320" height="120"
+            style="border:1px solid var(--line);border-radius:6px;background:#fff;touch-action:none;"></canvas>
+    <p><button type="button" class="btn sec small" id="clear-sig">Clear signature</button></p>
+    <input type="hidden" name="signature_data" id="signature_data">
+    <label style="font-weight:600;">
+      <input type="checkbox" name="photo_consent" value="1" style="width:auto;">
+      Patient consents to the arrival photo
+    </label>
+  </div>
+</div>
+<p><button type="submit" class="btn">Complete check-in</button></p>
+</form>
+
+<script>
+(function(){
+  var video=document.getElementById('cam'), snap=document.getElementById('snap');
+  var startBtn=document.getElementById('start-cam'), capBtn=document.getElementById('capture');
+  var msg=document.getElementById('cam-msg'), preview=document.getElementById('photo-preview');
+  var photoData=document.getElementById('arrival_photo_data');
+
+  startBtn.addEventListener('click', function(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      msg.textContent='No camera API in this browser. Upload a photo instead:'; return;
+    }
+    navigator.mediaDevices.getUserMedia({video:true}).then(function(stream){
+      video.srcObject=stream; capBtn.disabled=false;
+    }).catch(function(){
+      msg.textContent='Camera unavailable or blocked. Upload a photo instead:';
+    });
+  });
+  capBtn.addEventListener('click', function(){
+    snap.width=video.videoWidth||320; snap.height=video.videoHeight||240;
+    snap.getContext('2d').drawImage(video,0,0,snap.width,snap.height);
+    var url=snap.toDataURL('image/jpeg',0.85);
+    photoData.value=url;
+    preview.innerHTML='<img src="'+url+'" style="max-width:320px;border:1px solid #ccc;'
+      +'border-radius:6px;margin-top:.4rem;">';
+  });
+
+  var pad=document.getElementById('sigpad'), ctx=pad.getContext('2d');
+  ctx.lineWidth=2; ctx.lineCap='round'; ctx.strokeStyle='#1a2233';
+  var drawing=false, hasDrawn=false;
+  function pos(e){ var r=pad.getBoundingClientRect();
+    return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+  pad.addEventListener('pointerdown', function(e){
+    drawing=true; hasDrawn=true; var p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); });
+  pad.addEventListener('pointermove', function(e){
+    if(!drawing) return; var p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); });
+  window.addEventListener('pointerup', function(){ drawing=false; });
+  document.getElementById('clear-sig').addEventListener('click', function(){
+    ctx.clearRect(0,0,pad.width,pad.height); hasDrawn=false; });
+  document.getElementById('checkin-form').addEventListener('submit', function(){
+    if(hasDrawn){ document.getElementById('signature_data').value=pad.toDataURL('image/png'); }
+  });
+})();
+</script>
+{% endblock %}
