@@ -56,6 +56,14 @@ which needs no BAA because the data never leaves the building.
 
 This is the single most important compliance check in the whole project.
 
+> **Note on product naming.** Confirm the **exact product name as written on the
+> signed BAA** (for example a clinician-oriented ChatGPT offering is still a specific
+> named product — get it in writing). Also confirm the BAA is with **OpenAI
+> directly** and not with a third-party "clinician" tool that is merely *built on*
+> OpenAI — if it is a third party, *that company* is the business associate and the
+> BAA must be with them, and they in turn need their own BAA with OpenAI. Only send
+> PHI to the exact product the BAA names.
+
 ## 4.3 Encryption
 
 - **At rest:** full-disk encryption on the server; the database and the file/photo

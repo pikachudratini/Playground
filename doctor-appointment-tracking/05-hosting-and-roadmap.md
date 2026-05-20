@@ -1,14 +1,32 @@
 # 5. Hosting, Roadmap & Decisions
 
-## 5.1 Hosting — the options
+## 5.1 Hosting — options to present to the doctor
 
-You asked: local server at the office, cloud, or GitHub? Here is the honest comparison.
+You asked for clear options to take to the doctor. GitHub is **not** one of them —
+GitHub stores *code only*, never patient data or the running system (see doc 4).
+Here are the four real options. (Costs are rough estimates to frame the discussion.)
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **On-premises** mini-server at the office | PHI never leaves the building; no monthly cloud bill; simplest BAA story | The office owns patching, security, and uptime; a disk failure or theft loses data unless backups are solid |
-| **Cloud** (AWS / Azure / GCP — all offer BAAs) | Professional backups, uptime, physical security | Monthly cost; requires a signed BAA *and* correct configuration; PHI lives off-site |
-| **GitHub** | — | **Not a hosting option, and not a data store.** GitHub holds *code only* (see doc 4) |
+| Option | What it is | Rough cost | Who maintains it | Where PHI lives |
+|--------|-----------|-----------|------------------|-----------------|
+| **A — On-premises mini-server** | A small always-on mini-PC at the office | ~$400–800 one-time hardware + ~$5–20/mo encrypted cloud backup | The office / its IT contractor | In the building |
+| **B — HIPAA-eligible cloud VM** | A server rented from AWS, Microsoft Azure, or Google Cloud (all sign BAAs) | ~$30–150/mo | Office/contractor configures; provider runs the hardware | Provider data center (under BAA) |
+| **C — Managed HIPAA hosting** | A host specializing in HIPAA-compliant deployments, with a BAA and hardened defaults included | ~$100–400+/mo | Mostly the platform | Platform data center (under BAA) |
+| **D — Hybrid / phased** | Start with A, move to B or C later if upkeep becomes a burden | Starts as A | Starts as A | Starts in the building |
+
+**Trade-offs in plain terms:**
+
+- **Option A** is cheapest, keeps PHI physically in the office, and has the simplest
+  BAA story (only the backup vendor needs one). The cost is that the office owns
+  patching, security, and uptime, and a fire/theft loses data unless the off-site
+  backups are solid and *tested*.
+- **Option B** removes the hardware burden and gives professional backups, uptime,
+  and physical security — but adds a monthly bill, puts PHI off-site, and *requires
+  correct configuration*: misconfigured cloud storage is the single most common cause
+  of healthcare data breaches.
+- **Option C** costs the most but folds compliance into the platform, which suits an
+  office that wants almost no IT involvement.
+- **Option D** is the realistic path: it is not a one-way door — the application is
+  built to move between these without a redesign.
 
 ### Recommendation: on-prem app + encrypted off-site backups
 

@@ -29,7 +29,9 @@ have to think about it.
 | 2 | [02-architecture-and-data-model.md](02-architecture-and-data-model.md) | System components, the data model, recommended tech stack |
 | 3 | [03-reconciliation-and-automation.md](03-reconciliation-and-automation.md) | The payment-matching engine, no-show detection, the 4-month auto-check, dispute emails |
 | 4 | [04-hipaa-compliance.md](04-hipaa-compliance.md) | HIPAA, BAAs, encryption, the OpenAI BAA caveat, de-identification |
-| 5 | [05-hosting-and-roadmap.md](05-hosting-and-roadmap.md) | Where it runs, GitHub's role, the phased build plan, decisions needed |
+| 5 | [05-hosting-and-roadmap.md](05-hosting-and-roadmap.md) | Hosting options for the doctor, GitHub's role, the phased build plan, decisions needed |
+| 6 | [06-hipaa-risk-analysis-draft.md](06-hipaa-risk-analysis-draft.md) | A draft HIPAA Security Risk Analysis + how to engage a compliance professional |
+| 7 | [07-build-vs-buy-and-getting-started.md](07-build-vs-buy-and-getting-started.md) | Existing software & reusable modules, the webcam/signature check-in, how the build works |
 
 ---
 
