@@ -1,4 +1,5 @@
 .env
+.env.local
 __pycache__/
 *.pyc
 *.pyo
@@ -6,3 +7,11 @@ __pycache__/
 venv/
 *.log
 .DS_Store
+
+# Next.js / marketing OS
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+/data/
