@@ -1,0 +1,19 @@
+{
+  "name": "webgen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI website generator — Firecrawl branding extraction, visual directions, hero visuals, static site build, and Vercel deploy in one CLI pipeline.",
+  "type": "module",
+  "bin": {
+    "webgen": "./bin/webgen.js"
+  },
+  "scripts": {
+    "start": "node bin/webgen.js",
+    "help": "node bin/webgen.js --help",
+    "demo": "node bin/webgen.js run https://stripe.com --no-deploy"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "license": "MIT"
+}
